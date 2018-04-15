@@ -190,8 +190,8 @@ const autoIndent = (code) => {
 // 1) ... equals ... (and ... and ...)
 const replaceVariableAssignment = (words) => {
   let code = words;
-  const variableAssignment = /^(let |var |variable |const |set )?([^ ]+) (equals?( to)?|=) (.+)/i; // i means case-insensitive
-  // const variableAssignment = /^(let |var |variable |const )?([^ ]+) (equals?|=) (.+)( and .+)?/i; // i means case-insensitive
+  const variableAssignment = /^(let |var |variable |const |set )?([^ ]+) (equals?( to)?|=|is) (.+)/i; // i means case-insensitive
+  // const variableAssignment = /^(let |var |variable |const |set )?([^ ]+) (equals?( to)?|=|is) (.+)( and .+)?/i; // i means case-insensitive
   
   let match = words.match(variableAssignment);
   if (match) {
@@ -295,7 +295,7 @@ const replaceSay = (words) => {
 // 4) if ... equals ... (then)
 const replaceIf = (words) => {
   let code = words;
-  let match = words.match(/^if (.+) (equals?( to)?|=) (.+?)( then)?/i);
+  let match = words.match(/^if (.+) (equals?( to)?|=|is) (.+)( then)?/i);
   if (match) {
     let variableName = match[1];
     let variableValue = match[4];
