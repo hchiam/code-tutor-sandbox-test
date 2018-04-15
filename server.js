@@ -107,6 +107,8 @@ const makeIntoCode = (words) => {
   codeLines = codeLines.map(otherReplacements);
   // try to prevent nested loops (to avoid overly long runtimes)
   codeLines = suppressNestedLoops(codeLines);
+  // fix indents after if and for
+  codeLines = autoIndent(codeLines);
   
   return codeLines.join('\n'); // put it back together as one string
 }
@@ -145,6 +147,27 @@ const suppressNestedLoops = (code) => {
         code[i] = `<for security, can't loop inside loop>`;
       }
     }
+  }
+  
+  return code;
+}
+
+
+const autoIndent = (code) => {
+  if (code.length < 2) return code; // escape early
+  
+  let currIndents = 0;
+  
+  for (let i=1; i<code.length; i++) {
+    let prevIsIfOrFor = code[i-1].match(/[^ ]*(if |for ).+/i); // [^ ]* in case of existing indentation
+    let currLineCode = code[i].match(/\s*(.+)/i)[1]; // \s* in case of existing indentation
+    if (prevIsIfOrFor) {
+      currIndents++;
+    } else { // if (currIndents > -1) { // in future
+      // currIndents--; // in future
+      currIndents = 0;
+    } 
+    code[i] = ' '.repeat(currIndents) + currLineCode;
   }
   
   return code;
@@ -250,7 +273,7 @@ const replaceSay = (words) => {
     value = checkVariableValues(value);
     code = `say(${value});`;
     // (say ... ... times)
-    if (match[2]) code = `for (let i=0; i<${match[3]}; i++) {\n  ${code}\n}`;
+    if (match[2]) code = `for (let i=0; i<${match[3]}; i++)\n  ${code}`;
   }
   return code;
 }
@@ -265,7 +288,7 @@ const replaceIf = (words) => {
     // (if .. equals ... then ...)
     let matchThenWhat = match[2].match(/(.+) then (.+)/i);
     if (matchThenWhat) {
-      code = `if (${match[1]} == ${checkVariableValues(matchThenWhat[1])}) {\n ${replaceSay(replaceVariableAssignment(matchThenWhat[2]))}\n}`;
+      code = `if (${match[1]} == ${checkVariableValues(matchThenWhat[1])})\n  ${replaceSay(replaceVariableAssignment(matchThenWhat[2]))}`;
     }
   }
   return code;
