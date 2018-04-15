@@ -101,8 +101,12 @@ const makeIntoCode = (words) => {
   
   codeLines = codeLines.map(replaceVariableAssignment); // 1) ... equals ... (and ... and ...)
   
-  getVariables(codeLines); // so other replacements functions can replace string words with recognized variables
-  codeLines = codeLines.map(otherReplacements); // do other other replacements
+  // so other replacements functions can replace string words with recognized variables
+  getVariables(codeLines);
+  // do other other replacements
+  codeLines = codeLines.map(otherReplacements);
+  // try to prevent nested loops (to avoid overly long runtimes)
+  codeLines = suppressNestedLoops(codeLines);
   
   return codeLines.join('\n'); // put it back together as one string
 }
@@ -117,6 +121,21 @@ const otherReplacements = (words) => {
   code = handleDelete(code); // 5) delete line ...
   code = handleRunCode(code); // 6) run code
   code = handleUndo(code); // 7) undo
+  
+  return code;
+}
+
+
+const suppressNestedLoops = (code) => {
+  if (code.length < 2) return code; // escape early
+  
+  for (let i=1; i<code.length; i++) {
+    let line1IsFor = code[i-1].startsWith('for ');
+    let line2IsFor = code[i].startsWith('for ');
+    if (line1IsFor && line2IsFor) {
+      code[i] = `<for security, can't loop right after/inside loop>`;
+    }
+  }
   
   return code;
 }
@@ -195,8 +214,11 @@ const isNotAVariable = (word) => {
 // 2) repeat ... times
 const replaceLoop = (words) => {
   let code = words;
-  let match = words.match(/(repeat|for) (.+) times?/i); // \d times -> .+ times, in case variable name
+  let match = words.match(/^(repeat|for) (.+) times?/i); // \d times -> .+ times, in case variable name
   if (match) code = `for (let i=0; i<${match[2]}; i++)`;
+  // (for ... to ...)
+  let matchAlternate = words.match(/^for (.+) to (.+?)( times?)?/i);
+  if (matchAlternate) code = `for (let i=${matchAlternate[1]}; i<=${matchAlternate[2]}; i++)`;
   return code;
 }
 
