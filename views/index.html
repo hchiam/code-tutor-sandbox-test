@@ -132,7 +132,7 @@
         if (code === undefined) return code;
         let newCode = code.split('\n');
         for (let i=0; i<newCode.length; i++) {
-          newCode[i] = i + '   ' + newCode[i];
+          newCode[i] = String(i).padStart(3,' ') + '\t' + newCode[i];
         }
         return newCode.join('\n');
       }
