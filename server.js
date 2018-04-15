@@ -154,20 +154,33 @@ const suppressNestedLoops = (code) => {
 
 
 const autoIndent = (code) => {
+  
+  // handle special-recognition phrases that have more than 1 line generated from 1 line of natural-language text
+  for (let i=0; i<code.length; i++) {
+    if (code[i].includes('\n')) {
+      let firstPart = code[i].split('\n')[0];
+      let secondPart = code[i].split('\n')[1];
+      code[i] = secondPart;
+      code.splice(i, 0, firstPart);
+    }
+  }
+  
   if (code.length < 2) return code; // escape early
   
+  // initialize
   let currIndents = 0;
   
+  // go through each line of code
   for (let i=1; i<code.length; i++) {
-    let prevIsIfOrFor = code[i-1].match(/[^ ]*(if |for ).+/i); // [^ ]* in case of existing indentation
-    let currLineCode = code[i].match(/\s*(.+)/i)[1]; // \s* in case of existing indentation
+    let prevIsIfOrFor = code[i-1].match(/ *(if |for ).+/i);
+    let currLineCode = code[i];//.match(/ *(.+)/i)[1];
     if (prevIsIfOrFor) {
       currIndents++;
     } else { // if (currIndents > -1) { // in future
       // currIndents--; // in future
       currIndents = 0;
     } 
-    code[i] = ' '.repeat(currIndents) + currLineCode;
+    code[i] = '  '.repeat(currIndents) + currLineCode;
   }
   
   return code;
@@ -273,7 +286,7 @@ const replaceSay = (words) => {
     value = checkVariableValues(value);
     code = `say(${value});`;
     // (say ... ... times)
-    if (match[2]) code = `for (let i=0; i<${match[3]}; i++)\n  ${code}`;
+    if (match[2]) code = `for (let i=0; i<${match[3]}; i++)\n${code}`;
   }
   return code;
 }
@@ -282,14 +295,12 @@ const replaceSay = (words) => {
 // 4) if ... equals ... (then)
 const replaceIf = (words) => {
   let code = words;
-  let match = words.match(/if (.+) equals (.+)( then( (.+)))?/i);
+  let match = words.match(/^if (.+) (equals?( to)?|=) (.+?)( then)?/i);
   if (match) {
-    code = `if (${match[1]} == ${checkVariableValues(match[2])})`;
-    // (if .. equals ... then ...)
-    let matchThenWhat = match[2].match(/(.+) then (.+)/i);
-    if (matchThenWhat) {
-      code = `if (${match[1]} == ${checkVariableValues(matchThenWhat[1])})\n  ${replaceSay(replaceVariableAssignment(matchThenWhat[2]))}`;
-    }
+    let variableName = match[1];
+    let variableValue = match[4];
+    code = `if (${variableName} == ${checkVariableValues(variableValue)})`;
+    // do not enable "if ... equals ... then ..." because that would complicate other things
   }
   return code;
 }
