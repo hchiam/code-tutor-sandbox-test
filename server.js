@@ -195,7 +195,7 @@ const isNotAVariable = (word) => {
 // 2) repeat ... times
 const replaceLoop = (words) => {
   let code = words;
-  let match = words.match(/(repeat|for) (\d+) times?/i);
+  let match = words.match(/(repeat|for) (.+) times?/i); // \d times -> .+ times, in case variable name
   if (match) code = `for (let i=0; i<${match[2]}; i++)`;
   return code;
 }
@@ -204,7 +204,7 @@ const replaceLoop = (words) => {
 // 3) say ...
 const replaceSay = (words) => {
   let code = words;
-  let match = words.match(/^say (.+?)( (\d+) times?)?$/i);
+  let match = words.match(/^say (.+?)( (.+) times?)?$/i); // \d times -> .+ times, in case variable name
   if (match) {
     let value = match[1];
     value = checkVariableValues(value);
