@@ -130,10 +130,20 @@ const suppressNestedLoops = (code) => {
   if (code.length < 2) return code; // escape early
   
   for (let i=1; i<code.length; i++) {
-    let prevIsFor = code[i-1].startsWith('for ');
-    let currIsFor = code[i].startsWith('for ');
+    let prevIsFor = code[i-1].match(/[^ ]*for /i); // [^ ]* in case of indenting
+    let currIsFor = code[i].match(/[^ ]*for /i);
+    // for -> for
     if (prevIsFor && currIsFor) {
       code[i] = `<for security, can't loop right after/inside loop>`;
+    }
+    // for -> if -> for
+    if (i > 2) {
+      let preprevIsFor = code[i-2].match(/[^ ]*for /i);
+      let prevIsIf = code[i-1].match(/[^ ]*if /i);
+      let currIsFor = code[i].match(/[^ ]*for /i);
+      if (preprevIsFor && prevIsIf && currIsFor) {
+        code[i] = `<for security, can't loop inside loop>`;
+      }
     }
   }
   
