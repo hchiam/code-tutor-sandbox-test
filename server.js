@@ -6,7 +6,7 @@ const app = express();
 
 if (!process.env.DISABLE_XORIGIN) {
   app.use(function(req, res, next) {
-    var allowedOrigins = ['https://narrow-plane.gomix.me', 'https://www.freecodecamp.com'];
+    var allowedOrigins = ['codepen.io','https://www.freecodecamp.com'];
     var origin = req.headers.origin || '*';
     if(!process.env.XORIG_RESTRICT || allowedOrigins.indexOf(origin) > -1){
          console.log(origin);
@@ -19,15 +19,6 @@ if (!process.env.DISABLE_XORIGIN) {
 
 
 app.use('/public', express.static(process.cwd() + '/public'));
-
-// app.route('/_api/package.json')
-//   .get(function(req, res, next) {
-//     console.log('requested');
-//     fs.readFile(__dirname + '/package.json', function(err, data) {
-//       if(err) return next(err);
-//       res.type('txt').send(data.toString());
-//     });
-//   });
 
 
 app.route('/:words').get(function(req, res, next) {
@@ -82,6 +73,12 @@ app.listen(process.env.PORT, function () {
 
 let variables = []; // make this the only global variable so that getVariables and .map(otherReplacements) work right
 
+
+const userConfused = (words) => {
+  return !words.includes(' ') || words.match(/(^what.+?|^how.+?)/g);
+}
+
+
 const makeIntoCode = (words) => {
   if (userConfused(words)) {
     let decision = Math.floor((Math.random() * 6) + 1);
@@ -102,46 +99,28 @@ const makeIntoCode = (words) => {
   
   let codeLines = words.replace(/ +/g,' ').split('\n');
   
-  // 1) ... equals ... (and ... and ...)
-  codeLines = codeLines.map(replaceVariableAssignment);
+  codeLines = codeLines.map(replaceVariableAssignment); // 1) ... equals ... (and ... and ...)
   
-  // get variables to recognize and replace string words
-  getVariables(codeLines);
+  getVariables(codeLines); // so other replacements functions can replace string words with recognized variables
+  codeLines = codeLines.map(otherReplacements); // do other other replacements
   
-  // do other other replacements
-  codeLines = codeLines.map(otherReplacements);
-  
-  // put it back together as one string
-  return codeLines.join('\n');
+  return codeLines.join('\n'); // put it back together as one string
 }
 
-const userConfused = (words) => {
-  return !words.includes(' ') || words.match(/(^what.+?|^how.+?)/g);
-}
 
 const otherReplacements = (words) => {
   let code = words;
   
-  // 2) repeat ... times
-  code = replaceLoop(code);
-  
-  // 3) say ...
-  code = replaceSay(code);
-  
-  // 4) if ... equals ... (then)
-  code = replaceIf(code);
-  
-  // 5) delete line ...
-  code = handleDelete(code);
-  
-  // 6) run code
-  code = handleRunCode(code);
-  
-  // 7) undo
-  code = handleUndo(code);
+  code = replaceLoop(code); // 2) repeat ... times
+  code = replaceSay(code); // 3) say ...
+  code = replaceIf(code); // 4) if ... equals ... (then)
+  code = handleDelete(code); // 5) delete line ...
+  code = handleRunCode(code); // 6) run code
+  code = handleUndo(code); // 7) undo
   
   return code;
 }
+
 
 // 1) ... equals ... (and ... and ...)
 const replaceVariableAssignment = (words) => {
@@ -158,24 +137,27 @@ const replaceVariableAssignment = (words) => {
   return code;
 }
 
+
 const checkVariableValues = (value) => {
   let code = value;
   if (code.match(/.+ and .+/i)) {
     code = code.split(' and ').map(wrapNaNWithQuotes).join(', ');
     code = `[${code}]`;
-  } else if (isNaN(code)) {
+  } else if (isNaN(code) && isNotAVariable(code)) {
     code = `"${code}"`;
   }
   return code;
 }
 
+
 const wrapNaNWithQuotes = (elem) => {
-  if (isNaN(elem)) {
+  if (isNaN(elem) && isNotAVariable(elem)) {
     return `"${elem}"`;
   } else {
     return elem;
   }
 }
+
 
 // get variables to recognize and replace string words
 const getVariables = (codeLines_WithVariableAssignmentsMade) => {
@@ -204,18 +186,25 @@ const getVariables = (codeLines_WithVariableAssignmentsMade) => {
   variables = variables.join(', ');
 }
 
+
+const isNotAVariable = (word) => {
+  return !(variables.includes(word));
+}
+
+
 // 2) repeat ... times
 const replaceLoop = (words) => {
   let code = words;
-  let match = words.match(/(repeat|for) (\d+) times?/i);
+  let match = words.match(/(repeat|for) (.+) times?/i); // \d times -> .+ times, in case variable name
   if (match) code = `for (let i=0; i<${match[2]}; i++)`;
   return code;
 }
 
+
 // 3) say ...
 const replaceSay = (words) => {
   let code = words;
-  let match = words.match(/^say (.+?)( (\d+) times?)?$/i);
+  let match = words.match(/^say (.+?)( (.+) times?)?$/i); // \d times -> .+ times, in case variable name
   if (match) {
     let value = match[1];
     value = checkVariableValues(value);
@@ -225,6 +214,7 @@ const replaceSay = (words) => {
   }
   return code;
 }
+
 
 // 4) if ... equals ... (then)
 const replaceIf = (words) => {
@@ -241,6 +231,7 @@ const replaceIf = (words) => {
   return code;
 }
 
+
 // 5) delete line ...
 const handleDelete = (words) => {
   let code = words;
@@ -249,11 +240,13 @@ const handleDelete = (words) => {
   return code;
 }
 
+
 // 6) run code
 const handleRunCode = (words) => {
   if (words === 'run code') return '<run code>';
   return words;
 }
+
 
 // 7) undo
 const handleUndo = (words) => {
