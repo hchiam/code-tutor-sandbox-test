@@ -167,7 +167,11 @@ const checkVariableValues = (value) => {
     code = code.split(' and ').map(wrapNaNWithQuotes).join(', ');
     code = `[${code}]`;
   } else if (isNaN(code) && isNotAVariable(code)) {
-    code = `"${code}"`;
+    if (code.includes(' plus')) {
+      code = code.replace(/ plus/g,' +');
+    } else {
+      code = `"${code}"`;
+    }
   }
   return code;
 }
