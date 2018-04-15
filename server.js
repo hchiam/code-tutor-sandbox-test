@@ -151,7 +151,11 @@ const replaceVariableAssignment = (words) => {
   if (match) {
     let variableName = match[2];
     let variableValue = checkVariableValues(match[5]);
-    code = `let ${variableName} = ${variableValue};`;
+    if (variableValue.includes(variableName)) {
+      code = `${variableName} = ${variableValue};`;
+    } else {
+      code = `let ${variableName} = ${variableValue};`;
+    }
   }
   return code;
 }
