@@ -1,3 +1,5 @@
+// Trying to understand this code? Skip down to "here's the interesting stuff".
+
 'use strict';
 
 const fs = require('fs');
@@ -99,14 +101,19 @@ const makeIntoCode = (words) => {
   
   let codeLines = words.replace(/ +/g,' ').split('\n');
   
+  variables = []; // reinitialize
+  
   codeLines = codeLines.map(replaceVariableAssignment); // 1) ... equals ... (and ... and ...)
   
   // so other replacements functions can replace string words with recognized variables
   getVariables(codeLines);
+  
   // do other other replacements
   codeLines = codeLines.map(otherReplacements);
+  
   // try to prevent nested loops (to avoid overly long runtimes)
   codeLines = suppressNestedLoops(codeLines);
+  
   // fix indents after if and for
   codeLines = autoIndent(codeLines);
   
@@ -197,10 +204,11 @@ const replaceVariableAssignment = (words) => {
   if (match) {
     let variableName = match[2];
     let variableValue = checkVariableValues(match[5]);
-    if (variableValue.includes(variableName)) {
+    if (variableValue.includes(variableName) || variables.includes(variableName)) {
       code = `${variableName} = ${variableValue};`;
     } else {
       code = `let ${variableName} = ${variableValue};`;
+      variables.push(variableName);
     }
   }
   return code;
@@ -236,8 +244,8 @@ const wrapNaNWithQuotes = (elem) => {
 const getVariables = (codeLines_WithVariableAssignmentsMade) => {
   variables = codeLines_WithVariableAssignmentsMade.reduce(
     (total, elem) => {
-      if (String(elem).startsWith('let ')) {
-        return total + '., ' + elem;
+      if (String(elem).startsWith('let ') && !total.includes(elem.match(/let (.+) = .+;/i)[1])) {
+        return total + '., ' + !total.includes(elem.match(/let (.+) = .+;/i)[1]) + elem;
       } else {
         return total;
       }
