@@ -32,14 +32,18 @@
       Code Tutor Sandbox Test!
     </h1>
     <div id="get-data-from-server-app">
-      <h2>Words:</h2>
       <div id="input-test">
+        <h2>Words:</h2>
         <textarea id="i" v-model="inpt" v-on:input="loadData" cols="30" title="You can hit 'enter' to make a new line" placeholder="Start typing here." autofocus></textarea>
       </div>
-      <h2>Code:</h2>
-      <textarea id="o" readonly cols="30">{{lineNumberedCode}}</textarea>
-      <h2>Variables:</h2>
-      <textarea readonly>{{rsp.variables}}</textarea>
+      <div v-show="inpt">
+        <h2>Code:</h2>
+        <textarea id="o" readonly cols="30">{{lineNumberedCode}}</textarea>
+      </div>
+      <div v-show="inpt">
+        <h2>Variables:</h2>
+        <textarea readonly>{{rsp.variables}}</textarea>
+      </div>
       <!--<div v-if="error != null" class="notification is-danger">
         <button class="delete"></button>
         {{error}}
