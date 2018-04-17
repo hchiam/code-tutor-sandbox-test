@@ -236,8 +236,8 @@ const wrapNaNWithQuotes = (elem) => {
 const getVariables = (codeLines_WithVariableAssignmentsMade) => {
   variables = codeLines_WithVariableAssignmentsMade.reduce(
     (total, elem) => {
-      if (String(elem).startsWith('let ')) {
-        return total + '., ' + elem;
+      if (String(elem).startsWith('let ') && !total.includes(elem.match(/let (.+) = .+;/i)[1])) {
+        return total + '., ' + !total.includes(elem.match(/let (.+) = .+;/i)[1]) + elem;
       } else {
         return total;
       }
