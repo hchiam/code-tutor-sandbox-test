@@ -1,3 +1,5 @@
+// Trying to understand this code? Skip down to "here's the interesting stuff".
+
 'use strict';
 
 const fs = require('fs');
@@ -103,10 +105,13 @@ const makeIntoCode = (words) => {
   
   // so other replacements functions can replace string words with recognized variables
   getVariables(codeLines);
+  
   // do other other replacements
   codeLines = codeLines.map(otherReplacements);
+  
   // try to prevent nested loops (to avoid overly long runtimes)
   codeLines = suppressNestedLoops(codeLines);
+  
   // fix indents after if and for
   codeLines = autoIndent(codeLines);
   
@@ -197,10 +202,11 @@ const replaceVariableAssignment = (words) => {
   if (match) {
     let variableName = match[2];
     let variableValue = checkVariableValues(match[5]);
-    if (variableValue.includes(variableName)) {
+    if (variableValue.includes(variableName) || variables.includes(variableName)) {
       code = `${variableName} = ${variableValue};`;
     } else {
       code = `let ${variableName} = ${variableValue};`;
+      variables.push(variableName);
     }
   }
   return code;
