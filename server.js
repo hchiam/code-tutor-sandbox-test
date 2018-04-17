@@ -101,6 +101,8 @@ const makeIntoCode = (words) => {
   
   let codeLines = words.replace(/ +/g,' ').split('\n');
   
+  variables = []; // reinitialize
+  
   codeLines = codeLines.map(replaceVariableAssignment); // 1) ... equals ... (and ... and ...)
   
   // so other replacements functions can replace string words with recognized variables
