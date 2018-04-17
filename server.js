@@ -75,11 +75,9 @@ app.listen(process.env.PORT, function () {
 
 let variables = []; // make this the only global variable so that getVariables and .map(otherReplacements) work right
 
-
 const userConfused = (words) => {
   return !words.includes(' ') || words.match(/(^what.+?|^how.+?)/g);
 }
-
 
 const makeIntoCode = (words) => {
   if (userConfused(words)) {
@@ -121,6 +119,7 @@ const makeIntoCode = (words) => {
 }
 
 
+
 const otherReplacements = (words) => {
   let code = words;
   
@@ -133,6 +132,7 @@ const otherReplacements = (words) => {
   
   return code;
 }
+
 
 
 const suppressNestedLoops = (code) => {
@@ -158,6 +158,7 @@ const suppressNestedLoops = (code) => {
   
   return code;
 }
+
 
 
 const autoIndent = (code) => {
@@ -194,6 +195,7 @@ const autoIndent = (code) => {
 }
 
 
+
 // 1) ... equals ... (and ... and ...)
 const replaceVariableAssignment = (words) => {
   let code = words;
@@ -215,6 +217,7 @@ const replaceVariableAssignment = (words) => {
 }
 
 
+
 const checkVariableValues = (value) => {
   let code = value;
   if (code.match(/.+ and .+/i)) {
@@ -231,6 +234,7 @@ const checkVariableValues = (value) => {
 }
 
 
+
 const wrapNaNWithQuotes = (elem) => {
   if (isNaN(elem) && isNotAVariable(elem)) {
     return `"${elem}"`;
@@ -238,6 +242,7 @@ const wrapNaNWithQuotes = (elem) => {
     return elem;
   }
 }
+
 
 
 // get variables to recognize and replace string words
@@ -273,6 +278,7 @@ const isNotAVariable = (word) => {
 }
 
 
+
 // 2) repeat ... times
 const replaceLoop = (words) => {
   let code = words;
@@ -283,6 +289,7 @@ const replaceLoop = (words) => {
   if (matchAlternate) code = `for (let i=${matchAlternate[1]}; i<=${matchAlternate[2]}; i++)`;
   return code;
 }
+
 
 
 // 3) say ...
@@ -300,6 +307,7 @@ const replaceSay = (words) => {
 }
 
 
+
 // 4) if ... equals ... (then)
 const replaceIf = (words) => {
   let code = words;
@@ -314,6 +322,7 @@ const replaceIf = (words) => {
 }
 
 
+
 // 5) delete line ...
 const handleDelete = (words) => {
   let code = words;
@@ -323,11 +332,13 @@ const handleDelete = (words) => {
 }
 
 
+
 // 6) run code
 const handleRunCode = (words) => {
   if (words === 'run code') return '<run code>';
   return words;
 }
+
 
 
 // 7) undo
@@ -339,5 +350,3 @@ const handleUndo = (words) => {
 
 
 /////////////////////////////////////////////////////////////////////////////////
-
-
