@@ -75,11 +75,9 @@ app.listen(process.env.PORT, function () {
 
 let variables = []; // make this the only global variable so that getVariables and .map(otherReplacements) work right
 
-
 const userConfused = (words) => {
   return !words.includes(' ') || words.match(/(^what.+?|^how.+?)/g);
 }
-
 
 const makeIntoCode = (words) => {
   if (userConfused(words)) {
@@ -111,14 +109,12 @@ const makeIntoCode = (words) => {
   // do other other replacements
   codeLines = codeLines.map(otherReplacements);
   
-  // try to prevent nested loops (to avoid overly long runtimes)
-  codeLines = suppressNestedLoops(codeLines);
-  
   // fix indents after if and for
   codeLines = autoIndent(codeLines);
   
   return codeLines.join('\n'); // put it back together as one string
 }
+
 
 
 const otherReplacements = (words) => {
@@ -134,30 +130,6 @@ const otherReplacements = (words) => {
   return code;
 }
 
-
-const suppressNestedLoops = (code) => {
-  if (code.length < 2) return code; // escape early
-  
-  for (let i=1; i<code.length; i++) {
-    let prevIsFor = code[i-1].match(/[^ ]*for /i); // [^ ]* in case of indenting
-    let currIsFor = code[i].match(/[^ ]*for /i);
-    // for -> for
-    if (prevIsFor && currIsFor) {
-      code[i] = `<for security, can't loop right after/inside loop>`;
-    }
-    // for -> if -> for
-    if (i > 2) {
-      let preprevIsFor = code[i-2].match(/[^ ]*for /i);
-      let prevIsIf = code[i-1].match(/[^ ]*if /i);
-      let currIsFor = code[i].match(/[^ ]*for /i);
-      if (preprevIsFor && prevIsIf && currIsFor) {
-        code[i] = `<for security, can't loop inside loop>`;
-      }
-    }
-  }
-  
-  return code;
-}
 
 
 const autoIndent = (code) => {
@@ -180,8 +152,9 @@ const autoIndent = (code) => {
   // go through each line of code
   for (let i=1; i<code.length; i++) {
     let prevIsIfOrFor = code[i-1].match(/ *(if |for ).+/i);
+    let currIsIfOrFor = code[i].match(/ *(if |for ).+/i);
     let currLineCode = code[i];//.match(/ *(.+)/i)[1];
-    if (prevIsIfOrFor) {
+    if (prevIsIfOrFor && !currIsIfOrFor) {
       currIndents++;
     } else { // if (currIndents > -1) { // in future
       // currIndents--; // in future
@@ -192,6 +165,7 @@ const autoIndent = (code) => {
   
   return code;
 }
+
 
 
 // 1) ... equals ... (and ... and ...)
@@ -211,12 +185,15 @@ const replaceVariableAssignment = (words) => {
       variables.push(variableName);
     }
   }
+  
   return code;
 }
 
 
+
 const checkVariableValues = (value) => {
   let code = value;
+  
   if (code.match(/.+ and .+/i)) {
     code = code.split(' and ').map(wrapNaNWithQuotes).join(', ');
     code = `[${code}]`;
@@ -227,8 +204,10 @@ const checkVariableValues = (value) => {
       code = `"${code}"`;
     }
   }
+  
   return code;
 }
+
 
 
 const wrapNaNWithQuotes = (elem) => {
@@ -240,8 +219,10 @@ const wrapNaNWithQuotes = (elem) => {
 }
 
 
+
 // get variables to recognize and replace string words
 const getVariables = (codeLines_WithVariableAssignmentsMade) => {
+  
   variables = codeLines_WithVariableAssignmentsMade.reduce(
     (total, elem) => {
       if (String(elem).startsWith('let ') && !total.includes(elem.match(/let (.+) = .+;/i)[1])) {
@@ -251,6 +232,7 @@ const getVariables = (codeLines_WithVariableAssignmentsMade) => {
       }
     }
   );
+  
   variables = variables.split('., ').map(
     (elem) => {
       let match = elem.match(/let (.+) = .+;/i);
@@ -261,9 +243,11 @@ const getVariables = (codeLines_WithVariableAssignmentsMade) => {
       }
     }
   );
+  
   if (variables[0] === '<delete this>') {
     variables = variables.slice(1);
   }
+  
   variables = variables.join(', ');
 }
 
@@ -271,6 +255,7 @@ const getVariables = (codeLines_WithVariableAssignmentsMade) => {
 const isNotAVariable = (word) => {
   return !(variables.includes(word));
 }
+
 
 
 // 2) repeat ... times
@@ -283,6 +268,7 @@ const replaceLoop = (words) => {
   if (matchAlternate) code = `for (let i=${matchAlternate[1]}; i<=${matchAlternate[2]}; i++)`;
   return code;
 }
+
 
 
 // 3) say ...
@@ -300,6 +286,7 @@ const replaceSay = (words) => {
 }
 
 
+
 // 4) if ... equals ... (then)
 const replaceIf = (words) => {
   let code = words;
@@ -314,6 +301,7 @@ const replaceIf = (words) => {
 }
 
 
+
 // 5) delete line ...
 const handleDelete = (words) => {
   let code = words;
@@ -323,11 +311,13 @@ const handleDelete = (words) => {
 }
 
 
+
 // 6) run code
 const handleRunCode = (words) => {
   if (words === 'run code') return '<run code>';
   return words;
 }
+
 
 
 // 7) undo
@@ -339,5 +329,3 @@ const handleUndo = (words) => {
 
 
 /////////////////////////////////////////////////////////////////////////////////
-
-
