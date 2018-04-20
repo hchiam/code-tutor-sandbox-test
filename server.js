@@ -26,10 +26,14 @@ app.use('/public', express.static(process.cwd() + '/public'));
 app.route('/:words').get(function(req, res, next) {
   var requestData = req.params.words;
   
+  let code = makeIntoCode(requestData);
+  let output = getOutput(code);
+  
   // here's what we send back:
   var outputData = {
-    code: makeIntoCode(requestData),
-    variables: variables
+    code: code,
+    variables: variables,
+    output: output
   };
   
   // here we actually send the data back:
@@ -326,6 +330,70 @@ const handleUndo = (words) => {
   return words;
 }
 
+
+
+// figure out the audio output based on the code
+const getOutput = (code) => {
+  
+  // escape early if there's no audio output (i.e. if say() is not even used)
+  if (!code.match(/.*say(.+);.*/i)) return '';
+  
+  // otherwise try to figure out the output
+  let sayings = code.split('\n').map((elem) => {
+    let isSaying = elem.match(/say[(](.+?)[)]/i); // /say[(](.+?)[)]/i // /say[(]"?(.+?)"?[)]/i
+    if (isSaying) {
+      return isSaying[1];
+    } else {
+      return '';
+    }
+  }).reduce((total, elem) => {
+    if (elem !== '') return total + ' ' + elem;
+    return total;
+  });
+  
+  return sayings;
+}
+
+
+
+// testing string as image
+const stringAsImage = () => {
+  return `
+░░░███████░░░░░░
+░██░░░░░░░██░░░░
+█░░░░░░░░░░░█░░░
+█░░░░░░░░██░█░██
+█░░░░░░░░░█████░
+░██░░░░░░░░░█░░░
+░░░███████░░░░░░
+`;
+/*
+█░░░░░░░░░░░░░░░█
+░█░░░░░░░░░░░░░█░
+░░█████████████░░
+░░█░░░░░░░░░░░█░░
+░░█░░░░█░█░░░░█░░
+░░█░░░░░█░░░░░█░░
+░░█░░░░█░█░░░░█░░
+░░█░░░░░░░░░░░█░░
+░░█████████████░░
+*/
+/*
+░░░░░░░░░░░░░░░
+░░░█░██████░░░░
+░░░░░░░░░░░░░░░
+░░░█░██████░░░░
+░░░░░░░░░░░░░░░
+░░░█░██████░░░░
+░░░░░░░░░░░░░░░
+*/
+/*
+░██░░░█░░░░░░░░
+█░░█░░████░░███
+████░░█░░█░░█░░
+█░░█░░████░░███
+*/
+}
 
 
 /////////////////////////////////////////////////////////////////////////////////

@@ -47,6 +47,10 @@
         <h2>Variables:</h2>
         <textarea readonly>{{rsp.variables}}</textarea>
       </div>
+      <div v-show="inpt">
+        <h2>Output:</h2>
+        <textarea readonly>{{rsp.output}}</textarea>
+      </div>
       <!--<div v-if="error != null" class="notification is-danger">
         <button class="delete"></button>
         {{error}}
