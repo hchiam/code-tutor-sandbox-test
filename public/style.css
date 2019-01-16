@@ -1,35 +1,34 @@
-/****** Main Styling ******/
+/* styles */
+/* called by your view template */
+
+/* You might want to try something fancier: */
+/* less: http://lesscss.org/ */
+
+* {
+  box-sizing: border-box;
+}
 
 body {
-	font-family: 'Roboto', sans-serif;
-	font-size: 16px;
-	color: #222;
-	background-color: #ECF0F1;
-	text-align: center;
+  font-family: helvetica, arial, sans-serif;
+  margin: 25px;
 }
 
-.container {
-	padding: 0;
-	margin-top: 40px;
+h1 {
+  font-weight: bold;
+  color: blue;
 }
 
-.footer {
-	margin-top: 60px;
+main img {
+  margin-top: 30px;
+  width: 800px;
 }
 
-ol {
-	list-style-position: inside;
-}
-ul {
-	list-style-type: none;
+footer {
+  margin-top: 50px;
+  padding-top: 25px;
+  border-top: 1px solid lightgrey;
 }
 
-a {
-	color: #2574A9;
-}
-/****** Logo Div Styling ******/
-
-img {
-	margin: 20px auto 0 auto;
-	display: block;
+footer > a {
+  color: #BBBBBB;
 }

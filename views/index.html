@@ -1,156 +1,46 @@
+<!-- This is a static file -->
+<!-- served from your routes in server.js -->
+
+<!-- You might want to try something fancier: -->
+<!-- html/nunjucks docs: http://mozilla.github.io/nunjucks/ -->
+<!-- jade: http://jade-lang.com/ -->
+<!-- haml: http://haml.info/tutorial.html -->
+<!-- hbs(handlebars): http://handlebarsjs.com/expressions.html -->
+
 <!DOCTYPE html>
 <html>
-  
   <head>
-    <style>
-      body {
-        font-family: avenir, arial;
-        font-size: 20px;
-        text-align: center;
-        background: rgb(40,40,30);
-        color: whitesmoke;
-      }
-      textarea {
-        font-family: avenir, arial;
-        font-size: 14px;
-        background: whitesmoke;
-        border-radius: 5px;
-        padding: 10px;
-      }
-      a {
-        background: grey;
-      }
-      #more-info {
-        text-align: left;
-        padding: 5%;
-      }
-    </style>
+    <title>Welcome to Glitch!</title>
+    <meta name="description" content="A cool thing made with Glitch">
+    <link id="favicon" rel="icon" href="https://gomix.com/favicon-app.ico" type="image/x-icon">
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="/style.css">
   </head>
-
   <body>
-    <h1>
-      Code Tutor Sandbox Test!
-    </h1>
-    <div id="get-data-from-server-app">
-      <p v-show="browserIsNotChrome">
-        <b>For best results, view this page in the latest Chrome browser.</b>
-      </p>
-      <div id="input-test">
-        <h2>Words:</h2>
-        <textarea id="i" v-model="inpt" v-on:input="loadData" cols="30" title="You can hit 'enter' to make a new line" placeholder="Start typing here." autofocus></textarea>
-      </div>
-      <div v-show="inpt">
-        <h2>Code:</h2>
-        <textarea id="o" readonly cols="30">{{lineNumberedCode}}</textarea>
-      </div>
-      <div v-show="inpt">
-        <h2>Variables:</h2>
-        <textarea readonly>{{rsp.variables}}</textarea>
-      </div>
-      <div v-show="inpt">
-        <h2>Output:</h2>
-        <textarea readonly>{{rsp.output}}</textarea>
-      </div>
-      <!--<div v-if="error != null" class="notification is-danger">
-        <button class="delete"></button>
-        {{error}}
-      </div> -->
-    </div>
-    <div id="more-info">
-      <h2>More:</h2>
+    <header>
+      <h1>Actions on Google API.AI Boilerplate</h1>
+    </header>
+    <div class="glitchButton" style="position: absolute; top: 40px; right: 40px;"></div>
+
+    <main>
       <p>
-        <a href="https://glitch.com/edit/#!/code-tutor-sandbox-test?path=server.js" target="_blank">
-          https://glitch.com/edit/#!/code-tutor-sandbox-test?path=server.js
-        </a>
+        This is a template for building your own <a href="https://developers.google.com/actions/">Actions on Google</a> for the Google Home. 
+        Watch a demo of building with this boilerplate from SXSW below:
       </p>
-      <p>
-        See <a href="https://github.com/hchiam/code-tutor" target="_blank">https://github.com/hchiam/code-tutor</a>
-      </p>
-      <p>
-        and <a href="https://codepen.io/hchiam/full/mxZpda/" target="_blank">https://codepen.io/hchiam/full/mxZpda/</a>
-      </p>
-    </div>
-    <script src="https://vuejs.org/js/vue.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/vue.resource/1.0.3/vue-resource.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
-    <script>
-      new Vue({
-        el:'#get-data-from-server-app',
-        data: {
-          error: null,
-          rsp: null,
-          inpt: ''
-        },
-        created: function() {
-          this.init();
-        },
-        computed: {
-          browserIsNotChrome: function() {
-            return !(/Chrome/.test(navigator.userAgent) && /Google Inc/.test(navigator.vendor));
-          },
-          url: function() {
-            $('#i').attr('rows', (this.inpt+'\n').match(/\n/g).length);
+      
+      <div style="position:relative;height:0;padding-bottom:56.25%"><iframe src="https://www.youtube.com/embed/qCY0cG9R3H4?ecver=2" width="640" height="360" frameborder="0" style="position:absolute;width:100%;height:100%;left:0" allowfullscreen></iframe></div>      
+      
+      <img src="https://cdn.glitch.com/216ad9f8-8b2b-4a63-b11a-675087c02c37%2Fdemo.gif?1495739346963">
+    </main>
 
-            let maxWidthI = (this.inpt+'\n')
-            .split('\n')
-            .map(len)
-            .reduce((a, b) => { return Math.max(a, b); });
-            maxWidthI = Math.max(maxWidthI, 30);
-            $('#i').attr('cols', maxWidthI);
+    <script src="https://button.glitch.me/button.js" data-style="glitch"></script>
+    <!-- Your web-app is https, so your scripts need to be too -->
+    <script src="https://code.jquery.com/jquery-2.2.1.min.js"
+            integrity="sha256-gvQgAFzTH6trSrAWoH1iPo9Xc96QxSZ3feW6kem+O00="
+            crossorigin="anonymous"></script>
+    <script src="/client.js"></script>
 
-            if (this.rsp) {
-              $('#o').attr('rows', Math.max(1, (this.rsp.code+'\n').match(/\n/g).length+2));
-
-              let maxWidthO = (this.rsp.code+'\n')
-              .split('\n')
-              .map(len)
-              .reduce((a, b) => { return Math.max(a, b); });
-              maxWidthO = Math.max(maxWidthO, 30);
-              $('#o').attr('cols', maxWidthO);
-            }
-
-            return "https://code-tutor-sandbox-test.glitch.me/" + this.inpt;
-          },
-          lineNumberedCode: function() {
-            if (this.rsp !== null) return addLineNumbers(this.rsp.code);
-            return this.rsp;
-          },
-        },
-        methods: {
-          init: function() {
-            this.loadData();
-          },
-          loadData: function() {
-            // this.url = "https://code-tutor-sandbox-test.glitch.me/"
-            // this.url = this.url + this.inpt;
-            this.$http.get(this.url).then((response) => { 
-              if(!!response.body) {
-                this.rsp = response.body;
-              }
-            }, (response) => {
-              this.error = response;
-            });
-          },
-        }
-      });
-
-      Array.prototype.max = function() {
-        return Math.max.apply(null, this);
-      };
-
-      function len(elem) {
-        return elem.length;
-      }
-
-      function addLineNumbers(code) {
-        if (code === undefined) return code;
-        let newCode = code.split('\n');
-        for (let i=0; i<newCode.length; i++) {
-          newCode[i] = String(i).padStart(3,' ') + '\t' + newCode[i];
-        }
-        return newCode.join('\n');
-      }
-    </script>
   </body>
-  
 </html>

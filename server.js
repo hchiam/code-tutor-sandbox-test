@@ -1,422 +1,331 @@
-// Trying to understand this code? Skip down to "here's the interesting stuff".
+// server.js
+// where your node app starts
 
-'use strict';
-
-const fs = require('fs');
+// imports
 const express = require('express');
+const ApiAiAssistant = require('actions-on-google').ApiAiAssistant;
+const bodyParser = require('body-parser');
+const request = require('request');
+const Map = require('es6-map');
+const prettyjson = require('prettyjson');
+
+// will use Express.js for higher-level code
 const app = express();
 
-if (!process.env.DISABLE_XORIGIN) {
-  app.use(function(req, res, next) {
-    var allowedOrigins = ['codepen.io','https://www.freecodecamp.com'];
-    var origin = req.headers.origin || '*';
-    if(!process.env.XORIG_RESTRICT || allowedOrigins.indexOf(origin) > -1){
-         console.log(origin);
-         res.setHeader('Access-Control-Allow-Origin', origin);
-         res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
-    }
+app.use(bodyParser.json({type: 'application/json'}));
+
+// http://expressjs.com/en/starter/static-files.html
+app.use(express.static('public'));
+
+// http://expressjs.com/en/starter/basic-routing.html
+app.get("/", function (request, response) {
+  response.sendFile(__dirname + '/views/index.html');
+});
+
+// Uncomment the below function to check the authenticity of the API.AI requests.
+// See https://docs.api.ai/docs/webhook#section-authentication
+/*app.post('/', function(req, res, next) {
+  // Instantiate a new API.AI assistant object.
+  const assistant = new ApiAiAssistant({request: req, response: res});
+  
+  // Throw an error if the request is not valid.
+  if(assistant.isRequestFromApiAi(process.env.API_AI_SECRET_HEADER_KEY, 
+                                  process.env.API_AI_SECRET_HEADER_VALUE)) {
     next();
-  });
-}
-
-
-app.use('/public', express.static(process.cwd() + '/public'));
-
-
-app.route('/:words').get(function(req, res, next) {
-  var requestData = req.params.words;
-  
-  let code = makeIntoCode(requestData);
-  let output = getOutput(code);
-  
-  // here's what we send back:
-  var outputData = {
-    code: code,
-    variables: variables,
-    output: output
-  };
-  
-  // here we actually send the data back:
-  res.type('json').send(outputData);
-});
-
-
-app.route('/').get(function(req, res) {
-  res.sendFile(process.cwd() + '/views/index.html');
-  // var outputData = {code: '< Enter code in natural language >'};
-  // res.type('json').send(outputData);
-})
-
-
-// Respond not found to all the wrong routes
-app.use(function(req, res, next){
-  res.status(404);
-  res.type('txt').send('404: Not found');
-});
-
-
-// Error Middleware
-app.use(function(err, req, res, next) {
-  if(err) {
-    res.status(err.status || 500)
-      .type('txt')
-      .send(err.message || 'SERVER ERROR');
-  }  
-})
-
-
-app.listen(process.env.PORT, function () {
-  console.log('Node.js listening ...');
-});
-
-
-
-/////////////////////////////////////////////////////////////////////////////////
-
-
-
-// here's the interesting stuff:
-
-let variables = []; // make this the only global variable so that getVariables and .map(otherReplacements) work right
-
-const userConfused = (words) => {
-  return !words.includes(' ') || words.match(/(^what.+?|^how.+?)/g);
-}
-
-const makeIntoCode = (words) => {
-  if (userConfused(words)) {
-    let decision = Math.floor((Math.random() * 6) + 1);
-    if (decision === 1) {
-      return 'Try this: say hi';
-    } else if (decision === 2) {
-      return 'Try this: say hi 3 times';
-    } else if (decision === 3) {
-      return 'Try this: let x equal 1';
-    } else if (decision === 4) {
-      return 'Try this: x equals 1 and a';
-    } else if (decision === 5) {
-      return 'Try this: set x equal to 3.14';
-    } else {
-      return 'Try this: x equals 1 and 2 and abc';
-    }
-  }
-  
-  let codeLines = words.replace(/ +/g,' ').split('\n');
-  
-  variables = []; // reinitialize
-  
-  codeLines = codeLines.map(replaceVariableAssignment); // 1) ... equals ... (and ... and ...)
-  
-  // so other replacements functions can replace string words with recognized variables
-  getVariables(codeLines);
-  
-  // do other other replacements
-  codeLines = codeLines.map(otherReplacements);
-  
-  // fix indents after if and for
-  codeLines = autoIndent(codeLines);
-  
-  return codeLines.join('\n'); // put it back together as one string
-}
-
-
-
-const otherReplacements = (words) => {
-  let code = words;
-  
-  code = replaceLoop(code); // 2) repeat ... times
-  code = replaceSay(code); // 3) say ...
-  code = replaceIf(code); // 4) if ... equals ... (then)
-  code = handleDelete(code); // 5) delete line ...
-  code = handleRunCode(code); // 6) run code
-  code = handleUndo(code); // 7) undo
-  
-  return code;
-}
-
-
-
-const autoIndent = (code) => {
-  
-  // handle special-recognition phrases that have more than 1 line generated from 1 line of natural-language text
-  for (let i=0; i<code.length; i++) {
-    if (code[i].includes('\n')) {
-      let firstPart = code[i].split('\n')[0];
-      let secondPart = code[i].split('\n')[1];
-      code[i] = secondPart;
-      code.splice(i, 0, firstPart);
-    }
-  }
-  
-  if (code.length < 2) return code; // escape early
-  
-  // initialize
-  let currIndents = 0;
-  
-  // go through each line of code
-  for (let i=1; i<code.length; i++) {
-    let prevIsIfOrFor = code[i-1].match(/ *(if |for ).+/i);
-    let currIsIfOrFor = code[i].match(/ *(if |for ).+/i);
-    let currLineCode = code[i];//.match(/ *(.+)/i)[1];
-    if (prevIsIfOrFor && !currIsIfOrFor) {
-      currIndents++;
-    } else { // if (currIndents > -1) { // in future
-      // currIndents--; // in future
-      currIndents = 0;
-    } 
-    code[i] = '  '.repeat(currIndents) + currLineCode;
-  }
-  
-  return code;
-}
-
-
-
-// 1) ... equals ... (and ... and ...)
-const replaceVariableAssignment = (words) => {
-  let code = words;
-  const variableAssignment = /^(let |var |variable |const |set )?([^ ]+) (equals?( to)?|=|is) (.+)/i; // i means case-insensitive
-  // const variableAssignment = /^(let |var |variable |const |set )?([^ ]+) (equals?( to)?|=|is) (.+)( and .+)?/i; // i means case-insensitive
-  
-  let match = words.match(variableAssignment);
-  if (match) {
-    let variableName = match[2];
-    let variableValue = checkVariableValues(match[5]);
-    if (variableValue.includes(variableName) || variables.includes(variableName)) {
-      code = `${variableName} = ${variableValue};`;
-    } else {
-      code = `let ${variableName} = ${variableValue};`;
-      variables.push(variableName);
-    }
-  }
-  
-  return code;
-}
-
-
-
-const checkVariableValues = (value) => {
-  let code = value;
-  
-  if (code.match(/.+ and .+/i)) {
-    code = code.split(' and ').map(wrapNaNWithQuotes).join(', ');
-    code = `[${code}]`;
-  } else if (isNaN(code) && isNotAVariable(code)) {
-    if (code.includes(' plus')) {
-      code = code.replace(/ plus/g,' +');
-    } else {
-      code = `"${code}"`;
-    }
-  }
-  
-  return code;
-}
-
-
-
-const wrapNaNWithQuotes = (elem) => {
-  if (isNaN(elem) && isNotAVariable(elem)) {
-    return `"${elem}"`;
   } else {
-    return elem;
+    console.log('Request failed validation - req.headers:', JSON.stringify(req.headers, null, 2));
+    
+    res.status(400).send('Invalid request');
   }
-}
+});*/
 
+// Handle webhook requests
+app.post('/', function(req, res, next) {
+  // Log the request headers and body, to aid in debugging. You'll be able to view the
+  // webhook requests coming from API.AI by clicking the Logs button the sidebar.
+  logObject('Request headers: ', req.headers);
+  logObject('Request body: ', req.body);
+    
+  // Instantiate a new API.AI assistant object.
+  const assistant = new ApiAiAssistant({request: req, response: res});
+  // assistant.tell(JSON.stringify(req.body))
+  
+  // Declare constants for your action and parameter names
+  const CALCULATE_ACTION = req.body.result.action; // 'c.to.f'; // The action name from the API.AI intent
+  const EXPRESSION_PARAMETER = 'number'; // An API.ai parameter name
 
-
-// get variables to recognize and replace string words
-const getVariables = (codeLines_WithVariableAssignmentsMade) => {
-  
-  variables = codeLines_WithVariableAssignmentsMade.reduce(
-    (total, elem) => {
-      if (String(elem).startsWith('let ') && !total.includes(elem.match(/let (.+) = .+;/i)[1])) {
-        return total + '., ' + !total.includes(elem.match(/let (.+) = .+;/i)[1]) + elem;
-      } else {
-        return total;
-      }
-    }
-  );
-  
-  variables = variables.split('., ').map(
-    (elem) => {
-      let match = elem.match(/let (.+) = .+;/i);
-      if (match) {
-        return elem.match(/let (.+) = .+;/i)[1];
-      } else {
-        return '<delete this>';
-      }
-    }
-  );
-  
-  if (variables[0] === '<delete this>') {
-    variables = variables.slice(1);
+  // Create functions to handle intents here
+  function getCalculation(assistant) {
+    console.log('Handling action: ' + CALCULATE_ACTION);
+    let number = assistant.getArgument(EXPRESSION_PARAMETER);
+    
+    // let requestURL = "https://www.calcatraz.com/calculator/api?c=1000*" + encodeURIComponent(number);
+    // request(requestURL, function(error, response) {
+    //   if(error) {
+    //     next(error);
+    //   } else {
+    //     let calculation = response.body;
+    //     assistant.tell(calculation);
+    //   }
+    // });
+    
+    // just get value
+    // assistant.tell(myCustomCode(CALCULATE_ACTION, number));
+    
+    // custom code
+    myCustomCode(CALCULATE_ACTION, number, assistant);
   }
   
-  variables = variables.join(', ');
-}
-
-
-const isNotAVariable = (word) => {
-  return !(variables.includes(word));
-}
-
-
-
-// 2) repeat ... times
-const replaceLoop = (words) => {
-  let code = words;
-  let match = words.match(/^(repeat|for) (.+) times?/i); // \d times -> .+ times, in case variable name
-  if (match) code = `for (let i=0; i<${match[2]}; i++)`;
-  // (for ... to ...)
-  let matchAlternate = words.match(/^for (.+) to (.+?)( times?)?/i);
-  if (matchAlternate) code = `for (let i=${matchAlternate[1]}; i<=${matchAlternate[2]}; i++)`;
-  return code;
-}
-
-
-
-// 3) say ...
-const replaceSay = (words) => {
-  let code = words;
-  let match = words.match(/^say (.+?)( (.+) times?)?$/i); // \d times -> .+ times, in case variable name
-  if (match) {
-    let value = match[1];
-    value = checkVariableValues(value);
-    code = `say(${value});`;
-    // (say ... ... times)
-    if (match[2]) code = `for (let i=0; i<${match[3]}; i++)\n${code}`;
-  }
-  return code;
-}
-
-
-
-// 4) if ... equals ... (then)
-const replaceIf = (words) => {
-  let code = words;
-  let match = words.match(/^if (.+) (equals?( to)?|=|is) (.+)( then)?/i);
-  if (match) {
-    let variableName = match[1];
-    let variableValue = match[4];
-    code = `if (${variableName} == ${checkVariableValues(variableValue)})`;
-    // do not enable "if ... equals ... then ..." because that would complicate other things
-  }
-  return code;
-}
-
-
-
-// 5) delete line ...
-const handleDelete = (words) => {
-  let code = words;
-  let match = words.match(/delete line (.+)/i);
-  if (match) code = `<delete line ${match[1]}>`;
-  return code;
-}
-
-
-
-// 6) run code
-const handleRunCode = (words) => {
-  if (words === 'run code') return '<run code>';
-  return words;
-}
-
-
-
-// 7) undo
-const handleUndo = (words) => {
-  if (words === 'undo') return '<undo the previous line>';
-  return words;
-}
-
-
-
-// figure out the audio output based on the code
-const getOutput = (code) => {
+  // Add handler functions to the action router.
+  let actionRouter = new Map();
   
-  // escape early if there's no audio output (i.e. if say() is not even used)
-  if (!code.match(/.*say(.+);.*/i)) return '';
+  // The ASK_WEATHER_INTENT (askWeather) should map to the getWeather method.
+  actionRouter.set(CALCULATE_ACTION, getCalculation); // actionRouter.set(ASK_WEATHER_ACTION, getWeather);
   
-  // otherwise try to figure out the output
-  let sayings = code.split('\n').map((elem) => {
-    let isSaying = elem.match(/say[(](.+?)[)]/i); // /say[(](.+?)[)]/i // /say[(]"?(.+?)"?[)]/i
-    if (isSaying) {
-      return isSaying[1];
+  // Route requests to the proper handler functions via the action router.
+  assistant.handleRequest(actionRouter);
+});
+
+// Handle errors.
+app.use(function (err, req, res, next) {
+  console.error(err.stack)
+  res.status(500).send('Something broke!')
+})
+
+// Pretty print objects for logging.
+function logObject(message, object, options) {
+  console.log(message);
+  console.log(prettyjson.render(object, options));
+}
+
+// Listen for requests.
+let server = app.listen(process.env.PORT, function () {
+  console.log('Your app is listening on port ' + server.address().port);
+});
+
+
+
+// my custom code
+function myCustomCode(actionName, number, assistant) {
+  // check for invalid input:
+  if (isNaN(number)) { // escape function early if not given a number
+    assistant.ask('What is the new number?');
+  }
+  
+  // if (actionName === 'c.to.f') return 'What is ' + number + ' times 2?';
+  // if (actionName === 'c.to.f.step1') return 'Now what is ' + number + ' minus a tenth of ' + number + ' ?';
+  // if (actionName === 'c.to.f.step2') return 'Now what is ' + number + ' plus 32 ?';
+  // if (actionName === 'c.to.f.step3') return 'You have: ' + number;
+  
+  
+  // assistant.data stores the data for use in the rest of the conversation, but you can still ask questions at each step
+  if (actionName === 'toF') { // 'c.to.f') {
+    const step1 = number*2;
+    const step2 = Math.round(step1 - step1/10);
+    const step3 = step2 + 32;
+    assistant.data.originalValue = number;
+    assistant.data.step1 = step1;
+    assistant.data.step2 = step2;
+    assistant.data.step3 = step3;
+    // assistant.data.stepAt = 1;
+    assistant.data.contextOut = {'stepAt' : 1, 'unit' : 'c'};
+    let coin = Math.random();
+    if (coin < 0.5) {
+      assistant.ask('I heard ' + number + ' degrees Celsius. Step 1 to convert it to Fahrenheit: What is ' + number + ' times 2?');
     } else {
-      return '';
+      assistant.ask('I heard ' + number + ' degrees Celsius. Step 1: What is double of ' + number + '?');
     }
-  }).reduce((total, elem) => {
-    if (elem !== '') return total + ' ' + elem;
-    return total;
-  });
+  } else if (actionName === 'toC') {
+    const step1 = Math.round(number/2);
+    const step2 = Math.round(step1 + step1/10);
+    const step3 = step2 - 20;
+    const step4 = step3 + 2;
+    assistant.data.originalValue = number;
+    assistant.data.step1 = step1;
+    assistant.data.step2 = step2;
+    assistant.data.step3 = step3;
+    assistant.data.step4 = step4;
+    // assistant.data.stepAt = 1;
+    assistant.data.contextOut = {'stepAt' : 1, 'unit' : 'f'};
+    let coin = Math.random();
+    if (coin < 0.5) {
+      assistant.ask('I heard ' + number + ' degrees Fahrenheit. Step 1 to convert it to Celsius: What is half of ' + number + '? (To make things easier, round it.)');
+    } else {
+      assistant.ask('I heard ' + number + ' degrees Fahrenheit. Step 1: What is half of ' + number + '? (To make things easier, round it.)');
+    }
+  } else if (actionName === 'generate.example') {
+    let number = Math.floor((Math.random() * 100) + 1);
+    assistant.data.number = number;
+    let coin = Math.random();
+    if (coin < 0.5) {
+      const step1 = number*2;
+      const step2 = Math.round(step1 - step1/10);
+      const step3 = step2 + 32;
+      assistant.data.originalValue = number;
+      assistant.data.step1 = step1;
+      assistant.data.step2 = step2;
+      assistant.data.step3 = step3;
+      // assistant.data.stepAt = 1;
+      assistant.data.contextOut = {'stepAt' : 1, 'unit' : 'c'};
+      let coin = Math.random();
+      if (coin < 0.5) {
+        assistant.ask('I heard ' + number + ' degrees Celsius. Step 1 to turn it into degrees Fahrenheit: What is ' + number + ' times 2?');
+      } else {
+        assistant.ask('I heard ' + number + ' degrees Celsius. Step 1 to change it to Fahrenheit: What is ' + number + ' times 2?');
+      }
+    } else {
+      const step1 = Math.round(number/2);
+      const step2 = Math.round(step1 + step1/10);
+      const step3 = step2 - 20;
+      const step4 = step3 + 2;
+      assistant.data.originalValue = number;
+      assistant.data.step1 = step1;
+      assistant.data.step2 = step2;
+      assistant.data.step3 = step3;
+      assistant.data.step4 = step4;
+      // assistant.data.stepAt = 1;
+      assistant.data.contextOut = {'stepAt' : 1, 'unit' : 'f'};
+      let coin = Math.random();
+      if (coin < 0.5) {
+        assistant.ask('I heard ' + number + ' degrees Fahrenheit. The first step to change it to Celsius is to divide ' + number + ' by 2. What do you get? (To make things easier, round it.)');
+      } else {
+        assistant.ask('I heard ' + number + ' degrees Fahrenheit. Let\'s start converting it to Celsius: What is ' + number + ' divided by 2? (To make things easier, round it.)');
+      }
+    }
+    
+    
+  } else if (assistant.data.contextOut.unit === 'c') { // c to f
+    if (assistant.data.contextOut.stepAt === 1) {
+      let targetValue = Number(assistant.data.step1);
+      if (number == targetValue) {
+        assistant.data.stepAt = 2;
+        assistant.data.contextOut = {'stepAt' : 2, 'unit': 'c'};
+        assistant.ask(praise() + 'Step 2: Move the decimal in ' + number + ' a place to the left. Round it. And do ' + number + ' minus that number. What do you get? (You can guess.)');
+      } else if (number > targetValue) {
+        assistant.ask('Go' + detectCloseness(number,targetValue) + ' lower' + hintAddOn() + 'What is ' + assistant.data.originalValue + ' times 2?');
+      } else if (number < targetValue) {
+        assistant.ask('Go' + detectCloseness(number,targetValue) + ' higher' + hintAddOn() + 'What is ' + assistant.data.originalValue + ' times 2?');
+      } else {
+        assistant.ask('What is the new number?');
+      }
+    } else if (assistant.data.contextOut.stepAt === 2) {
+      let targetValue = Number(assistant.data.step2);
+      if (number == targetValue) {
+        assistant.data.stepAt = 3;
+        assistant.data.contextOut = {'stepAt' : 3, 'unit': 'c'};
+        assistant.ask(praise() + 'Step 3: What is ' + number + ' plus 32?');
+      } else if (number > targetValue) {
+        assistant.ask('Go' + detectCloseness(number,targetValue) + ' lower' + hintAddOn() + 'Take ' + assistant.data.step1 + ', and subtract from it ' + assistant.data.step1 + ' divided by 10. (And round it.)');
+      } else if (number < targetValue) {
+        assistant.ask('Go' + detectCloseness(number,targetValue) + ' higher' + hintAddOn() + 'Take ' + assistant.data.step1 + ', and subtract from it ' + assistant.data.step1 + ' divided by 10. (And round it.)');
+      } else {
+        assistant.ask('What is the new number?');
+      }
+    } else if (assistant.data.contextOut.stepAt === 3) {
+      let originalValue = Number(assistant.data.originalValue);
+      let targetValue = Number(assistant.data.step3);
+      if (number == targetValue) {
+        assistant.data.stepAt = 0;
+        assistant.data.unit = '';
+        assistant.data.contextOut = {'stepAt' : 0, 'unit' : ''};
+        assistant.tell("You got it! " + originalValue + " Celsius is about " + number + " Fahrenheit. Thanks for trying Mental Temperature Converter! Remember: practice makes perfect.");
+      } else if (number > targetValue) {
+        assistant.ask('Go' + detectCloseness(number,targetValue) + ' lower' + hintAddOn() + 'What\'s ' + assistant.data.step2 + ' plus 32?');
+      } else if (number < targetValue) {
+        assistant.ask('Go' + detectCloseness(number,targetValue) + ' higher' + hintAddOn() + 'What\'s ' + assistant.data.step2 + ' plus 32?');
+      } else {
+        assistant.ask('What is the new number?');
+      }
+    }
+    
+    
+  } else if (assistant.data.contextOut.unit === 'f') { // f to c
+    if (assistant.data.contextOut.stepAt === 1) {
+      let targetValue = Number(assistant.data.step1);
+      if (number == targetValue) {
+        // assistant.data.stepAt = 2;
+        assistant.data.contextOut = {'stepAt' : 2, 'unit': 'f'};
+        assistant.ask(praise() + 'Step 2: Move the decimal in ' + number + ' a place to the left. Round it. And add that to ' + number + '. What do you get? (You can guess.)');
+      } else if (number > targetValue) {
+        assistant.ask('Go' + detectCloseness(number,targetValue) + ' lower' + hintAddOn() + 'What\'s ' + assistant.data.originalValue + ' divided by 2, rounded?');
+      } else if (number < targetValue) {
+        assistant.ask('Go' + detectCloseness(number,targetValue) + ' higher' + hintAddOn() + 'What\'s ' + assistant.data.originalValue + ' divided by 2, rounded?');
+      } else {
+        assistant.ask('What is the new number?');
+      }
+    } else if (assistant.data.contextOut.stepAt === 2) {
+      let targetValue = Number(assistant.data.step2);
+      if (number == targetValue) {
+        // assistant.data.stepAt = 3;
+        assistant.data.contextOut = {'stepAt' : 3, 'unit': 'f'};
+        assistant.ask(praise() + 'Step 3: What is ' + number + ' minus 20?');
+      } else if (number > targetValue) {
+        assistant.ask('Go' + detectCloseness(number,targetValue) + ' lower' + hintAddOn() + 'Take ' + assistant.data.step1 + ', and add to it ' + assistant.data.step1 + ' divided by 10. (And round it.)');
+      } else if (number < targetValue) {
+        assistant.ask('Go' + detectCloseness(number,targetValue) + ' higher' + hintAddOn() + 'Take ' + assistant.data.step1 + ', and add to it ' + assistant.data.step1 + ' divided by 10. (And round it.)');
+      } else {
+        assistant.ask('What is the new number?');
+      }
+    } else if (assistant.data.contextOut.stepAt === 3) {
+      let targetValue = Number(assistant.data.step3);
+      if (number == targetValue) {
+        // assistant.data.stepAt = 4;
+        assistant.data.contextOut = {'stepAt' : 4, 'unit': 'f'};
+        assistant.ask(praise() + 'Step 4: What is ' + number + ' plus 2?');
+      } else if (number > targetValue) {
+        assistant.ask('Go' + detectCloseness(number,targetValue) + ' lower' + hintAddOn() + 'What\'s ' + assistant.data.step2 + ' minus 20?');
+      } else if (number < targetValue) {
+        assistant.ask('Go' + detectCloseness(number,targetValue) + ' higher' + hintAddOn() + 'What\'s ' + assistant.data.step2 + ' minus 20?');
+      } else {
+        assistant.ask('What is the new number?');
+      }
+    } else if (assistant.data.contextOut.stepAt === 4) {
+      let originalValue = Number(assistant.data.originalValue);
+      let targetValue = Number(assistant.data.step4);
+      if (number == targetValue) {
+        assistant.data.stepAt = 0;
+        assistant.data.unit = '';
+        assistant.data.contextOut = {'stepAt' : 0, 'unit' : ''};
+        assistant.tell("You got it! " + originalValue + " Fahrenheit is about " + number + " Celsius. Thanks for trying Mental Temperature Converter! Remember: practice makes perfect.");
+      } else if (number > targetValue) {
+        assistant.ask('Go' + detectCloseness(number,targetValue) + ' lower' + hintAddOn() + 'What\'s ' + assistant.data.step3 + ' plus 2?');
+      } else if (number < targetValue) {
+        assistant.ask('Go' + detectCloseness(number,targetValue) + ' higher' + hintAddOn() + 'What\'s ' + assistant.data.step3 + ' plus 2?');
+      } else {
+        assistant.ask('What is the new number?');
+      }
+    }
+  }
   
-  return sayings;
 }
 
 
-
-// testing string as image
-const stringAsImage = () => {
-  return `
-░████░░░░░░░░░░
-█░░░░█░░░░░░░░░
-█░░░░██████████
-█░░░░█░░░░████░
-░████░░░░░█░█░░
-`;
-/*
-█░░░░░░░░░░░░░░░█
-░█░░░░░░░░░░░░░█░
-░░█████████████░░
-░░█░░░░░░░░░░░█░░
-░░█░░░░█░█░░░░█░░
-░░█░░░░░█░░░░░█░░
-░░█░░░░█░█░░░░█░░
-░░█░░░░░░░░░░░█░░
-░░█████████████░░
-*/
-/*
-░░░░░░░░░░░░░░░
-░░░█░██████░░░░
-░░░░░░░░░░░░░░░
-░░░█░██████░░░░
-░░░░░░░░░░░░░░░
-░░░█░██████░░░░
-░░░░░░░░░░░░░░░
-*/
-/*
-░██░░░█░░░░░░░░
-█░░█░░████░░███
-████░░█░░█░░█░░
-█░░█░░████░░███
-*/
-/*
-░░░███████░░░░░░
-░██░░░░░░░██░░░░
-█░░░░░░░░░░░█░░░
-█░░░░░░░░██░█░██
-█░░░░░░░░░█████░
-░██░░░░░░░░░█░░░
-░░░███████░░░░░░
-*/
-/*
-░████░░░░░░░░░░
-█░░░░█░░░░░░░░░
-█░░░░██████████
-█░░░░█░░░░████░
-░████░░░░░█░█░░
-*/
-/*
-░░░░░░░░░░░█░░░░░
-░░█░░░░░░░█░░░█░░
-░█░░░░░░░█░░░░░█░
-█░░░░░░░█░░░░░░░█
-░█░░░░░█░░░░░░░█░
-░░█░░░█░░░░░░░█░░
-░░░░░█░░░░░░░░░░░
-*/
+// randomize end of hint sentences
+function hintAddOn() {
+  let coin = Math.random();
+  if (coin < 0.5) {
+    return '. ';
+  } else {
+    return ' than that. ';
+  }
 }
 
 
-/////////////////////////////////////////////////////////////////////////////////
+// detect closeness
+function detectCloseness(number,targetValue) {
+  if (Math.abs(number - targetValue) <= 5) {
+    return ' a little';
+  }
+  return '';
+}
+
+
+// randomize positive feedback/confirmation
+function praise() {
+  let coin = Math.random();
+  if (coin < 0.5) {
+    return 'Correct! ';
+  } else {
+    return 'Yes! ';
+  }
+}
