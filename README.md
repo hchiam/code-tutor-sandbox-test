@@ -1,7 +1,5 @@
 # Sandbox test for Code Tutor
 
-[![HitCount](http://hits.dwyl.io/hchiam/code-tutor-sandbox-test.svg)](http://hits.dwyl.io/hchiam/code-tutor-sandbox-test)
-
 Playing around with the idea of letting users create code with more flexibility than a planned lesson.
 
 <a href="https://glitch.com/edit/#!/code-tutor-sandbox-test?path=server.js" target="_blank">https://glitch.com/edit/#!/code-tutor-sandbox-test?path=server.js</a>
